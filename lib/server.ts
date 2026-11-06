@@ -1,5 +1,6 @@
 import { env } from 'cloudflare:workers';
-import { categories, demoState } from './model';
+import { categories, demoState, MIN_TEAMS, MAX_TEAMS } from './model';
+import { allocatePlayers } from './allocation';
 const encoder = new TextEncoder();
 export async function hash(s: string) { return Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', encoder.encode(s)))).map(x => x.toString(16).padStart(2, '0')).join(''); }
 function db() { if (!env.DB)
@@ -13,7 +14,14 @@ const one = async (sql: string, ...params: unknown[]) => db().prepare(sql).bind(
 const all = async (sql: string, ...params: unknown[]) => (await db().prepare(sql).bind(...params).all<any>()).results;
 function cookie(token: string, secure: boolean, max = 43200) { return `ef_session=${token}; Path=/; HttpOnly; SameSite=Strict; Max-Age=${max}${secure ? '; Secure' : ''}`; }
 async function session(req: Request) { const token = req.headers.get('cookie')?.match(/(?:^|;\s*)ef_session=([^;]+)/)?.[1]; if (!token)
-    return null; return one('SELECT * FROM sessions WHERE hash=? AND expires>?', await hash(token), Date.now()); }
+    return null;
+    const current = await one('SELECT * FROM sessions WHERE hash=? AND expires>?', await hash(token), Date.now());
+    if (current?.role === 'coach') {
+        const event = await one('SELECT team_count FROM events WHERE id=?', current.event);
+        if (!event || current.team < 1 || current.team > event.team_count) return null;
+    }
+    return current;
+}
 function onlyAdmin(s: any) { if (s.role !== 'admin')
     fail('Solo Antonio puede realizar esta acción.', 403); }
 async function eventAccess(s: any, event: string) { if (s.role !== 'admin' && s.event !== event)
@@ -67,8 +75,11 @@ async function route(req: Request, path: string[]) {
             access = { role: 'admin', event: '', team: 0 };
         else
             access = await one('SELECT * FROM access WHERE hash=?', await hash(code));
-        if (!access)
-            fail('Código incorrecto o acceso revocado.', 401);
+        if (!access) fail('Código incorrecto o acceso revocado.', 401);
+        if (access.role === 'coach') {
+            const event = await one('SELECT team_count FROM events WHERE id=?', access.event);
+            if (!event || access.team < 1 || access.team > event.team_count) fail('Este equipo ya no está activo en el evento.', 401);
+        }
         const token = id() + id();
         await run('INSERT INTO sessions (hash,role,event,team,expires) VALUES (?,?,?,?,?)', await hash(token), access.role, access.event, access.team, now + 43200000);
         return json({ ok: true }, 200, { 'Set-Cookie': cookie(token, secure) });
@@ -83,7 +94,7 @@ async function route(req: Request, path: string[]) {
     if (!s)
         fail('Inicia sesión para continuar.', 401);
     if (action === 'state' && req.method === 'GET') {
-        const events = s.role === 'admin' ? await all('SELECT * FROM events ORDER BY created DESC') : await all('SELECT * FROM events WHERE id=?', s.event);
+        const events = (s.role === 'admin' ? await all('SELECT * FROM events ORDER BY created DESC') : await all('SELECT * FROM events WHERE id=?', s.event)).map(e => ({ ...e, teamCount: e.team_count, rosterRevision: e.roster_revision }));
         const selected = url.searchParams.get('event') || events[0]?.id;
         if (!selected)
             return json({ role: s.role, team: s.team, event: null, events, players: [], news: [] });
@@ -119,14 +130,47 @@ async function route(req: Request, path: string[]) {
         await run('UPDATE events SET status=? WHERE id=?', body.status, body.event);
         return json({ ok: true });
     }
+    if (action === 'organize' && req.method === 'POST') {
+        onlyAdmin(s);
+        const event = await eventAccess(s, body.event);
+        if (event.status === 'closed') fail('Reabre el evento antes de organizar los equipos.', 409);
+        const teamCount = Number(body.teamCount);
+        if (!Number.isInteger(teamCount) || teamCount < MIN_TEAMS || teamCount > MAX_TEAMS) fail(`Elige entre ${MIN_TEAMS} y ${MAX_TEAMS} equipos.`);
+        if (!Number.isInteger(body.revision) || body.revision !== event.roster_revision) fail('El check-in ha cambiado. Actualiza la lista y vuelve a organizar.', 409);
+        const roster = await all('SELECT * FROM players WHERE event=? ORDER BY id', event.id);
+        if (roster.some(player => player.attendance === 'pending')) fail('Confirma Asiste o No asiste para todos los inscritos antes de organizar.');
+        let plan;
+        try {
+            plan = allocatePlayers(roster.map(player => ({ ...JSON.parse(player.data), id: player.id, attendance: player.attendance })), teamCount, event.id);
+        } catch (error: any) { fail(error.message); }
+        const assigned = new Map(plan.assignments.map(player => [player.id, player.team]));
+        const guard = 'EXISTS (SELECT 1 FROM events WHERE id=? AND roster_revision=? AND status<>?)';
+        const statements = roster.map(player => {
+            const team = assigned.get(player.id) || 0;
+            return db().prepare(`UPDATE players SET team=?,version=version+1 WHERE id=? AND event=? AND team<>? AND ${guard}`).bind(team, player.id, event.id, team, event.id, event.roster_revision, 'closed');
+        });
+        statements.push(db().prepare(`DELETE FROM access WHERE event=? AND role='coach' AND team>? AND ${guard}`).bind(event.id, teamCount, event.id, event.roster_revision, 'closed'));
+        statements.push(db().prepare(`DELETE FROM sessions WHERE event=? AND role='coach' AND team>? AND ${guard}`).bind(event.id, teamCount, event.id, event.roster_revision, 'closed'));
+        // Last statement advances the revision. A competing stale transaction changes
+        // no rows: every statement shares the same precondition and D1 batch is atomic.
+        statements.push(db().prepare("UPDATE events SET team_count=?,roster_revision=roster_revision+1 WHERE id=? AND roster_revision=? AND status<>'closed'").bind(teamCount, event.id, event.roster_revision));
+        const result = await db().batch(statements);
+        if (!result[result.length - 1].meta.changes) fail('La lista o el estado del evento ha cambiado durante el reparto. Actualiza y vuelve a intentarlo.', 409);
+        return json({ ...plan, revision: event.roster_revision + 1 });
+    }
     if (action === 'access' && req.method === 'POST') {
         onlyAdmin(s);
-        await eventAccess(s, body.event);
-        const team = Number(body.team) || 0, role = team ? 'coach' : 'speaker';
-        if (team < 0 || team > 4 || !Number.isInteger(team))
+        const event = await eventAccess(s, body.event);
+        const team = Number(body.team), role = team ? 'coach' : 'speaker';
+        if (team < 0 || team > event.team_count || !Number.isInteger(team))
             fail('Equipo no válido.');
         const code = Array.from(crypto.getRandomValues(new Uint8Array(10))).map(n => 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'[n % 32]).join('');
-        await db().batch([db().prepare('DELETE FROM access WHERE event=? AND role=? AND team=?').bind(body.event, role, team), db().prepare('DELETE FROM sessions WHERE event=? AND role=? AND team=?').bind(body.event, role, team), db().prepare('INSERT INTO access (id,event,role,team,hash) VALUES (?,?,?,?,?)').bind(id(), body.event, role, team, await hash(code))]);
+        const results = await db().batch([
+            db().prepare('DELETE FROM access WHERE event=? AND role=? AND team=?').bind(body.event, role, team),
+            db().prepare('DELETE FROM sessions WHERE event=? AND role=? AND team=?').bind(body.event, role, team),
+            db().prepare('INSERT INTO access (id,event,role,team,hash) SELECT ?,?,?,?,? WHERE EXISTS (SELECT 1 FROM events WHERE id=? AND team_count>=?)').bind(id(), body.event, role, team, await hash(code), body.event, team),
+        ]);
+        if (!results[2].meta.changes) fail('El número de equipos ha cambiado. Actualiza antes de generar el acceso.', 409);
         return json({ code, role, team });
     }
     if (action === 'sheet' && req.method === 'POST') {
@@ -174,11 +218,12 @@ async function route(req: Request, path: string[]) {
             rows.push(db().prepare('INSERT INTO players (id,event,team,attendance,data,version,goals) VALUES (?,?,0,?,?,0,0)').bind(id(), body.event, 'pending', JSON.stringify(data)));
         }
         for (let i = 0; i < rows.length; i += 75)
-            await db().batch(rows.slice(i, i + 75));
+            await db().batch([...rows.slice(i, i + 75), db().prepare('UPDATE events SET roster_revision=roster_revision+1 WHERE id=?').bind(body.event)]);
         return json({ added: rows.length, skipped });
     }
     if (action === 'player' && req.method === 'POST') {
         const p = await playerAccess(s, body.id);
+        const event = await eventAccess(s, p.event);
         const old = JSON.parse(p.data);
         const data = { ...old };
         const fields = s.role === 'admin' ? ['name', 'birthyear', 'club', 'position', 'phone', 'city', 'currentCategory', 'currentLeague', 'number'] : ['position', 'number'];
@@ -189,9 +234,13 @@ async function route(req: Request, path: string[]) {
             fail('El nombre es obligatorio.');
         const team = s.role === 'admin' && body.team !== undefined ? Number(body.team) : p.team;
         const attendance = s.role === 'admin' && body.attendance !== undefined ? body.attendance : p.attendance;
-        if (!Number.isInteger(team) || team < 0 || team > 4 || !['present', 'absent', 'pending'].includes(attendance))
+        if (!Number.isInteger(team) || team < 0 || team > event.team_count || !['present', 'absent', 'pending'].includes(attendance))
             fail('Equipo o asistencia no válido.');
-        const result = await run('UPDATE players SET data=?,team=?,attendance=?,version=version+1 WHERE id=? AND version=?', JSON.stringify(data), team, attendance, p.id, body.version);
+        const results = await db().batch([
+            db().prepare("UPDATE players SET data=?,team=?,attendance=?,version=version+1 WHERE id=? AND version=? AND EXISTS (SELECT 1 FROM events WHERE id=? AND team_count>=? AND status<>'closed')").bind(JSON.stringify(data), team, attendance, p.id, body.version, p.event, team),
+            db().prepare('UPDATE events SET roster_revision=roster_revision+1 WHERE id=?').bind(p.event),
+        ]);
+        const result = results[0];
         if (!result.meta.changes)
             fail('Otro dispositivo ha cambiado esta ficha. Actualiza y vuelve a intentarlo.', 409);
         return json({ ok: true });

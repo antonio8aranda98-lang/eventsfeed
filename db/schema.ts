@@ -1,5 +1,5 @@
 import { sqliteTable, text, integer } from 'drizzle-orm/sqlite-core';
-export const events = sqliteTable('events', { id: text().primaryKey(), name: text().notNull(), date: text().notNull(), location: text().notNull(), status: text().notNull(), created: integer().notNull() });
+export const events = sqliteTable('events', { id: text().primaryKey(), name: text().notNull(), date: text().notNull(), location: text().notNull(), status: text().notNull(), created: integer().notNull(), teamCount: integer('team_count').notNull().default(4), rosterRevision: integer('roster_revision').notNull().default(0) });
 export const players = sqliteTable('players', { id: text().primaryKey(), event: text().notNull(), team: integer().notNull().default(0), attendance: text().notNull().default('pending'), data: text().notNull(), version: integer().notNull().default(0), goals: integer().notNull().default(0) });
 export const evaluations = sqliteTable('evaluations', { player: text().primaryKey(), data: text().notNull(), version: integer().notNull().default(0), updated: integer().notNull(), author: text().notNull() });
 export const news = sqliteTable('news', { id: text().primaryKey(), event: text().notNull(), team: integer().notNull(), player: text(), text: text().notNull(), kind: text().notNull(), announced: integer().notNull().default(0), created: integer().notNull() });

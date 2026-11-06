@@ -15,7 +15,7 @@ export const formationSlots = [
 ] as const;
 export type SlotId = typeof formationSlots[number]['id'];
 
-const aliases: Record<string, readonly SlotId[]> = {};
+const aliases: Record<string, readonly SlotId[]> = Object.create(null);
 function register(names: string[], slots: SlotId[]) {
   for (const name of names) aliases[name] = slots;
 }

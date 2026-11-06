@@ -2,16 +2,25 @@ import { readFileSync } from 'node:fs';
 import assert from 'node:assert/strict';
 const base='http://127.0.0.1:5173/api/';
 const code=readFileSync('.dev.vars','utf8').match(/^ADMIN_PASSWORD=(.+)$/m)?.[1];
-async function request(path,body,cookie){const res=await fetch(base+path,{method:body?'POST':'GET',headers:{'Content-Type':'application/json',Origin:'http://127.0.0.1:5173',...(cookie?{cookie}:{})},body:body?JSON.stringify(body):undefined});const data=await res.json();assert.equal(res.status,200,JSON.stringify(data));return {data,cookie:res.headers.get('set-cookie')?.split(';')[0]};}
+async function request(path,body,cookie,expected=200){const res=await fetch(base+path,{method:body?'POST':'GET',headers:{'Content-Type':'application/json',Origin:'http://127.0.0.1:5173',...(cookie?{cookie}:{})},body:body?JSON.stringify(body):undefined});const data=await res.json();assert.equal(res.status,expected,JSON.stringify(data));return {data,cookie:res.headers.get('set-cookie')?.split(';')[0]};}
 const admin=(await request('login',{code})).cookie;
-const event=(await request('events',{name:'Prueba local · 80 jugadores ficticios'},admin)).data.id;
-const people=Array.from({length:80},(_,i)=>({name:`Jugador de prueba ${i+1}`,birthyear:'2008',club:'Club ficticio',position:i%11===0?'POR':'MC',phone:'SOLO-PRUEBA'}));
+const event=(await request('events',{name:'Prueba local · 100 jugadores ficticios'},admin)).data.id;
+const profiles=['POR','POR','LI','LI','DFC','DFC','DFC','LD','LD','MCD','MCD','MC','MC','MC','EI','EI','ED','ED','DC','DC'];
+const people=Array.from({length:100},(_,i)=>({name:`Jugador de prueba ${i+1}`,birthyear:'2008',club:'Club ficticio',position:profiles[i%20],phone:'SOLO-PRUEBA'}));
 await request('import',{event,players:people},admin);
 let state=(await request('state?event='+event,undefined,admin)).data;
-for(let i=0;i<state.players.length;i++)await request('player',{id:state.players[i].id,version:0,team:i%4+1,attendance:'present'},admin);
+for(let i=0;i<state.players.length;i++)await request('player',{id:state.players[i].id,version:0,attendance:'present'},admin);
+state=(await request('state?event='+event,undefined,admin)).data;
+const plan=(await request('organize',{event,teamCount:5,revision:state.event.rosterRevision},admin)).data;assert(plan.teams.every(t=>t.count===20&&t.coverage===11));
 const coaches=[];
-for(let team=1;team<=4;team++){const access=(await request('access',{event,team},admin)).data.code;const cookie=(await request('login',{code:access})).cookie;coaches.push(cookie);const own=(await request('state',undefined,cookie)).data;assert.equal(own.players.length,20);assert(own.players.every(p=>p.team===team&&!p.phone));await request('evaluation',{id:own.players[0].id,version:0,scores:[8,7,9,8],comment:'Validación local del guardado',category:'Preferente juvenil'},cookie);}
-state=(await request('state?event='+event,undefined,admin)).data;assert.equal(state.players.filter(p=>p.evaluation).length,4);
+for(let team=1;team<=5;team++){const access=(await request('access',{event,team},admin)).data.code;const cookie=(await request('login',{code:access})).cookie;coaches.push(cookie);const own=(await request('state',undefined,cookie)).data;assert.equal(own.players.length,20);assert(own.players.every(p=>p.team===team&&!p.phone));await request('evaluation',{id:own.players[0].id,version:0,scores:[8,7,9,8],comment:'Validación local del guardado',category:'Preferente juvenil'},cookie);}
+state=(await request('state?event='+event,undefined,admin)).data;assert.equal(state.players.filter(p=>p.evaluation).length,5);
 const p=state.players.find(p=>p.team===1);await request('news',{event,player:p.id,kind:'goal',requestId:crypto.randomUUID()},coaches[0]);
 const speakerCode=(await request('access',{event,team:0},admin)).data.code;const speaker=(await request('login',{code:speakerCode})).cookie;const speech=(await request('state',undefined,speaker)).data;assert.equal(speech.players.length,0);assert.equal(speech.news.length,1);await request('announce',{id:speech.news[0].id,announced:true},speaker);
-console.log('PASS: local HTTP + real D1 — 80 imports, 4 teams of 20, 4 simultaneous sessions, persisted assessments, speaker goal and acknowledgement.');
+state=(await request('state?event='+event,undefined,admin)).data;
+for(const player of state.players.slice(50))await request('player',{id:player.id,version:player.version,attendance:'absent'},admin);
+state=(await request('state?event='+event,undefined,admin)).data;
+const reduced=(await request('organize',{event,teamCount:3,revision:state.event.rosterRevision},admin)).data;assert.deepEqual(reduced.teams.map(t=>t.count),[17,17,16]);
+await request('state',undefined,coaches[4],401);
+state=(await request('state?event='+event,undefined,admin)).data;assert.equal(state.event.teamCount,3);assert.equal(state.players.filter(p=>p.evaluation).length,5);assert(state.players.filter(p=>p.attendance==='absent').every(p=>p.team===0));
+console.log('PASS: real HTTP + D1 — 100 attendees → 5 teams of 20; 50 attendees → 3 teams of 17/17/16; 5 coach sessions, evaluations retained, removed access revoked, speaker feed working.');
