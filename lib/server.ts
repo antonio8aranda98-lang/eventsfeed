@@ -138,7 +138,9 @@ async function route(req: Request, path: string[]) {
         if (!Number.isInteger(teamCount) || teamCount < MIN_TEAMS || teamCount > MAX_TEAMS) fail(`Elige entre ${MIN_TEAMS} y ${MAX_TEAMS} equipos.`);
         if (!Number.isInteger(body.revision) || body.revision !== event.roster_revision) fail('El check-in ha cambiado. Actualiza la lista y vuelve a organizar.', 409);
         const roster = await all('SELECT * FROM players WHERE event=? ORDER BY id', event.id);
-        if (roster.some(player => player.attendance === 'pending')) fail('Confirma Asiste o No asiste para todos los inscritos antes de organizar.');
+        const pending = roster.filter(player => player.attendance === 'pending');
+        const closeCheckin = body.closeCheckin === true;
+        if (pending.length && !closeCheckin) fail('Cierra el check-in para marcar los pendientes como No asiste y organizar los equipos.');
         let plan;
         try {
             plan = allocatePlayers(roster.map(player => ({ ...JSON.parse(player.data), id: player.id, attendance: player.attendance })), teamCount, event.id);
@@ -147,7 +149,8 @@ async function route(req: Request, path: string[]) {
         const guard = 'EXISTS (SELECT 1 FROM events WHERE id=? AND roster_revision=? AND status<>?)';
         const statements = roster.map(player => {
             const team = assigned.get(player.id) || 0;
-            return db().prepare(`UPDATE players SET team=?,version=version+1 WHERE id=? AND event=? AND team<>? AND ${guard}`).bind(team, player.id, event.id, team, event.id, event.roster_revision, 'closed');
+            const attendance = closeCheckin && player.attendance === 'pending' ? 'absent' : player.attendance;
+            return db().prepare(`UPDATE players SET team=?,attendance=?,version=version+1 WHERE id=? AND event=? AND (team<>? OR attendance<>?) AND ${guard}`).bind(team, attendance, player.id, event.id, team, attendance, event.id, event.roster_revision, 'closed');
         });
         statements.push(db().prepare(`DELETE FROM access WHERE event=? AND role='coach' AND team>? AND ${guard}`).bind(event.id, teamCount, event.id, event.roster_revision, 'closed'));
         statements.push(db().prepare(`DELETE FROM sessions WHERE event=? AND role='coach' AND team>? AND ${guard}`).bind(event.id, teamCount, event.id, event.roster_revision, 'closed'));
@@ -156,7 +159,7 @@ async function route(req: Request, path: string[]) {
         statements.push(db().prepare("UPDATE events SET team_count=?,roster_revision=roster_revision+1 WHERE id=? AND roster_revision=? AND status<>'closed'").bind(teamCount, event.id, event.roster_revision));
         const result = await db().batch(statements);
         if (!result[result.length - 1].meta.changes) fail('La lista o el estado del evento ha cambiado durante el reparto. Actualiza y vuelve a intentarlo.', 409);
-        return json({ ...plan, revision: event.roster_revision + 1 });
+        return json({ ...plan, revision: event.roster_revision + 1, closedPending: closeCheckin ? pending.length : 0 });
     }
     if (action === 'access' && req.method === 'POST') {
         onlyAdmin(s);

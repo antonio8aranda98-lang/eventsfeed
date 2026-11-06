@@ -26,3 +26,5 @@
 @media(max-width:850px){.organizer{padding:20px}.organizer-controls{gap:15px}.organizer-controls>.btn{margin-left:auto}.team-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:560px){.organizer{padding:17px}.organizer h2{font-size:17px}.organizer>header{align-items:flex-start;gap:10px}.organizer-symbol{width:38px;height:40px}.organizer>header .eyebrow{font-size:7px}.organizer>header p{font-size:10px}.organizer-attendance{gap:14px;font-size:10px}.organizer-attendance b{font-size:17px}.organizer-controls{gap:15px 12px}.organizer-controls label{min-width:110px;width:37%;font-size:10px}.organizer-suggestion{min-width:0;flex:1}.organizer-suggestion strong{font-size:11px;line-height:1.6}.organizer-suggestion button{font-size:9px;line-height:1.6}.organizer-controls>.btn{width:100%;min-height:46px}.organizer-method,.organizer-notice{font-size:9px}.organizer-result h3{font-size:12px}.organizer-result td{font-size:10px}}
 @media(pointer:coarse){.organizer select{min-height:46px;font-size:16px}.organizer-suggestion button{min-height:44px}}
+
+.organizer-notice.ready{background:#f0f5e7;border-color:#e1eacd;color:#7e9660}

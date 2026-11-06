@@ -6,7 +6,7 @@ Centro de operaciones para eventos de fútbol de hasta 300 jugadores presentes. 
 
 1. Antonio entra con su código y crea un evento con nombre, fecha y campo.
 2. Importa el CSV de inscritos: en Google Sheets, **Archivo → Descargar → Valores separados por comas**. La importación permite revisar y asignar las columnas. También puede leer un enlace exportable sin autenticación. No es necesario hacer pública una hoja privada.
-3. En **Check-in**, marca Asiste / No asiste para todos. Elige de 2 a 10 equipos y pulsa **Organizar equipos**. También puedes mover a un jugador manualmente después. Los nuevos jugadores entran como pendientes. Se pueden añadir y editar fichas manualmente.
+3. En **Check-in**, marca **Asiste** a quienes han venido. Elige de 2 a 10 equipos y pulsa **Cerrar check-in y organizar**: los pendientes pasan a **No asiste** y se reparten solo los presentes. Cuando ya no hay pendientes, el botón se llama **Organizar equipos**. También puedes mover a un jugador manualmente después. Los nuevos jugadores entran como pendientes. Se pueden añadir y editar fichas manualmente.
 4. En **Accesos de las tablets**, genera un código por equipo y otro para el speaker. Cada dispositivo abre la misma web e introduce su código. No necesita cuenta de ChatGPT.
 5. Cada entrenador ve solo a los jugadores presentes de su equipo, registra comentarios, notas de 1 a 10 en Físico, Imagen, Técnico y Táctico, y una categoría recomendada. **Guardar valoración** la envía a la base compartida.
 6. Los entrenadores registran goles, partidos sin encajar y noticias redactadas para megafonía. El speaker ve la cola y marca cada noticia como anunciada.
@@ -75,12 +75,14 @@ En un iPhone con un acceso anterior, elimina ese acceso y vuelve a añadir la di
 
 ## Organización automática por posiciones
 
-Antonio confirma todas las asistencias, elige de **2 a 10 equipos** y pulsa **Organizar equipos**. La sugerencia usa aproximadamente 20 jugadores por equipo: 50 presentes → 3 equipos (17/17/16), 80 → 4 de 20 y 100 → 5 de 20. El número elegido siempre lo decide Antonio. No se aplica ningún reparto por sí solo al desplegar esta función.
+Antonio marca a los asistentes, elige de **2 a 10 equipos** y pulsa **Cerrar check-in y organizar**. Los inscritos pendientes se marcan como **No asiste** en esa misma operación. La sugerencia usa aproximadamente 20 jugadores por equipo: 50 presentes → 3 equipos (17/17/16), 80 → 4 de 20 y 100 → 5 de 20. El número elegido siempre lo decide Antonio. No se aplica ningún reparto por sí solo al desplegar esta función.
 
 El algoritmo de flujo de coste mínimo asigna a cada asistente exactamente una vez y fija tamaños con diferencia máxima de un jugador. Busca cubrir los once puestos del 4-3-3 con jugadores distintos, prioriza los porteros y penaliza acumular jugadores en un mismo puesto. Respeta posiciones específicas y usa a los polivalentes donde ayudan al reparto; conserva la posición original de la ficha. Se muestran puestos sin cubrir y posiciones desconocidas, cuyos jugadores se distribuyen por tamaño. El equilibrio se basa en posiciones y número de jugadores, sin asumir un nivel deportivo que no se haya evaluado.
 
-El servidor comprueba que no queden asistencias pendientes, que el evento esté abierto y que la revisión del check-in siga vigente. Guarda todas las asignaciones y el número de equipos en una sola transacción. Si cambia la lista durante el cálculo o falla el guardado, no aplica un reparto parcial. La migración añade el número de equipos (4 por defecto para eventos existentes) y la revisión de la lista; no modifica jugadores ni valoraciones.
+El servidor comprueba que el evento esté abierto y que la revisión del check-in siga vigente. El cierre explícito (`closeCheckin: true`) convierte los pendientes en no asistentes y guarda el reparto y el número de equipos en una sola transacción. Las llamadas sin cierre explícito siguen rechazando listas con pendientes. Si cambia la lista durante el cálculo o falla el guardado, no aplica un reparto parcial. La migración añade el número de equipos (4 por defecto para eventos existentes) y la revisión de la lista; no modifica jugadores ni valoraciones.
 
 Los equipos nuevos tienen su propio acceso desde **Accesos de las tablets**. Los códigos y sesiones de los equipos eliminados se revocan; los de equipos que siguen existiendo se conservan. Se puede utilizar un móvil o una tablet por entrenador. Las valoraciones permanecen asociadas al jugador al reorganizar o moverlo manualmente.
 
 `npm test` incluye pruebas de tamaños, cobertura, porteros escasos, polivalencia, concurrencia, rollback de la transacción, permisos, conservación de valoraciones y revocación de accesos. `node tests/local-smoke.mjs` prueba el flujo completo contra la base **local**, usando solo jugadores ficticios.
+
+Si llega un jugador después del cierre del check-in, Antonio puede cambiarlo de **No asiste** a **Asiste** y asignarle un equipo, o volver a organizar. No hace falta reabrir el check-in.
