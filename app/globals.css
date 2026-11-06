@@ -8,3 +8,6 @@
 /* Touch controls remain comfortable on the four event tablets. */
 @media(pointer:coarse){.score-buttons button,.btn,.icon-btn{min-height:44px}.attendance-select,td select,.filter-group select{min-height:44px;font-size:12px}.player-name strong{font-size:13px}.player-name small{font-size:11px}.position-tag{font-size:11px}.player-name{min-height:44px}.metric label{font-size:14px}.field input,.field textarea,.field select{font-size:16px}.modal-tabs button{min-height:44px;font-size:12px}}
 @media(max-width:560px){.score-buttons{grid-template-columns:repeat(5,1fr);gap:6px}.score-buttons button{min-height:42px}.topbar-right{gap:4px}.topbar-right>.icon-btn{padding:7px}.topbar .breadcrumb{max-width:39%}}
+
+/* Shared app mark: the same football identity in Safari and on the home screen. */
+img.brandmark{padding:0;object-fit:cover;flex-shrink:0}

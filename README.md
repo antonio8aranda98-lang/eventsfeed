@@ -65,3 +65,9 @@ No se deben subir datos de jugadores, exportaciones, contraseñas ni `.dev.vars`
 ## Validación
 
 `npm test` ejecuta el servidor contra SQLite en memoria y comprueba acceso anónimo, permisos entre equipos/eventos, privacidad del speaker, persistencia de valoraciones, conflictos de edición, reasignaciones, renovación de accesos, cierre de eventos, importaciones y exportación CSV segura. El test solo usa jugadores ficticios.
+
+## Icono de pantalla de inicio
+
+El símbolo de campo y balón tiene versiones PNG opacas para iPhone/iPad (`apple-touch-icon`, 180 px), navegador (32 px) y otras instalaciones (192/512 px y versión maskable). El manifiesto define el nombre Eventsfeed y la apertura independiente. El SVG original está en `public/icons/eventsfeed-mark-v3.svg`; `node scripts/generate-icons.mjs` regenera las versiones PNG usando Sharp, disponible en el entorno del proyecto.
+
+En un iPhone con un acceso anterior, elimina ese acceso y vuelve a añadir la dirección pública desde Safari → Compartir → Añadir a pantalla de inicio para que el acceso nuevo use el icono configurado.
