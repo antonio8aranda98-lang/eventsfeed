@@ -29,8 +29,8 @@ register(['mcd', 'cdm', 'dm', 'pivote', 'pivot', 'mediocentro defensivo', 'medio
 register(['mc', 'cm', 'mediocentro', 'medio centro', 'centrocampista', 'interior', 'mco', 'mp', 'cam', 'mediapunta', 'media punta', 'medio ofensivo', 'mediocentro ofensivo'], ['lcm', 'rcm']);
 register(['mci', 'lcm', 'interior izquierdo', 'mediocentro izquierdo'], ['lcm']);
 register(['mcr', 'rcm', 'interior derecho', 'mediocentro derecho'], ['rcm']);
-register(['ei', 'lw', 'mi', 'extremo izquierdo', 'extremo izquierda', 'volante izquierdo', 'medio izquierdo'], ['lw']);
-register(['ed', 'rw', 'md', 'extremo derecho', 'extremo derecha', 'volante derecho', 'medio derecho'], ['rw']);
+register(['ei', 'ext izq', 'lw', 'mi', 'extremo izquierdo', 'extremo izquierda', 'volante izquierdo', 'medio izquierdo'], ['lw']);
+register(['ed', 'ext der', 'rw', 'md', 'extremo derecho', 'extremo derecha', 'volante derecho', 'medio derecho'], ['rw']);
 register(['dc', 'st', 'cf', 'delantero', 'delantero centro', 'delantero central', 'punta', 'sd', 'segundo delantero'], ['st']);
 register(['extremo', 'extremos'], ['lw', 'rw']);
 
