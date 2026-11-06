@@ -1,0 +1,43 @@
+.formation-panel{margin:22px 0 26px;background:#fff;border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.formation-heading{display:flex;justify-content:space-between;align-items:center;gap:14px;padding:22px 24px 13px}
+.formation-heading h2{display:flex;align-items:center;gap:9px;margin-top:8px;font-size:21px;letter-spacing:-.5px}
+.formation-heading p{font-size:11px;color:#8d997f;line-height:1.7;margin-top:8px}
+.formation-system{font-size:11px;letter-spacing:2px;background:#eaf0dd;padding:6px 9px;margin-left:5px;border-radius:5px;color:#6d8450;font-family:'DM Sans',sans-serif}
+.formation-count{display:flex;align-items:center;gap:7px;font-size:12px;background:#f0f4e8;padding:10px 12px;border-radius:7px;color:#8b9d72}
+.formation-explainer{font-size:11px;line-height:1.8;color:#87937b;padding:0 24px 18px;max-width:800px}
+.formation-field{position:relative;isolation:isolate;background:repeating-linear-gradient(0deg,#2d4b3c 0 100px,#304e3f 100px 200px);padding:16px 20px 23px;margin:0 16px;border:1px solid #3c5844;border-radius:8px;overflow:hidden}
+.formation-lines{position:absolute;inset:7px;width:calc(100% - 14px);height:calc(100% - 14px);fill:none;stroke:#b3c79d;stroke-opacity:.22;stroke-width:1.3;z-index:-1;pointer-events:none}
+.formation-direction{display:flex;align-items:center;justify-content:center;gap:5px;color:#b0c69b;font-size:8px;letter-spacing:2px;margin:0 0 18px}
+.formation-row{display:grid;gap:12px;position:relative;margin-bottom:19px;align-items:start}
+.formation-attack{grid-template-columns:repeat(3,minmax(0,1fr));padding:0 4%}
+.formation-interiors{grid-template-columns:repeat(2,minmax(0,1fr));padding:0 17%;gap:14%}
+.formation-pivot,.formation-goalkeeper{grid-template-columns:minmax(0,1fr);width:28%;margin-left:auto;margin-right:auto}
+.formation-defence{grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+.formation-goalkeeper{margin-bottom:0}
+.formation-slot{min-width:0;background:#fbfcf7f5;border:1px solid #e5eadb;border-radius:7px;padding:10px 9px;box-shadow:0 4px 12px #15281c12}
+.formation-slot.is-empty{background:#fcfdf2de;border-color:#cbd7bd}
+.formation-slot-heading{display:flex;align-items:center;justify-content:space-between;gap:4px}
+.formation-slot-heading h3{font-size:10px;letter-spacing:.5px;font-family:'DM Sans',sans-serif;font-weight:700;color:#526742;white-space:nowrap}
+.formation-slot-heading>span{font-size:9px;font-weight:600;color:#79945a;background:#e9f0dd;border-radius:4px;min-width:18px;padding:3px;text-align:center}
+.formation-position-name{font-size:9px;color:#9aa58a;margin-top:4px;line-height:1.5}
+.formation-candidates{margin-top:8px;max-height:180px;overflow:auto;scrollbar-width:thin;scrollbar-color:#c3d0b2 transparent}
+.formation-player{width:100%;display:flex;align-items:center;text-align:left;gap:6px;min-height:42px;padding:7px 2px;border-top:1px solid #e5ebdc;font-size:11px;line-height:1.4;color:#344d29;border-radius:3px}
+.formation-player:hover{background:#e6efda}
+.formation-player:focus-visible{outline:2px solid #81a45b;outline-offset:-1px}
+.formation-player>span:not(.formation-dorsal){min-width:0;overflow-wrap:anywhere;flex:1}
+.formation-player>svg{margin-left:auto;color:#a1af8e;flex-shrink:0}
+.formation-dorsal{display:flex;align-items:center;justify-content:center;width:21px;height:23px;background:#e5ecd9;border-radius:4px;font-size:10px;flex-shrink:0;color:#7a8d61}
+.formation-no-players{font-size:10px;font-style:italic;color:#98a58a;padding-top:12px;padding-bottom:5px}
+.formation-footnote{padding:14px 24px 18px;font-size:10px;color:#9ba58e;line-height:1.7}
+.formation-unplaced{border-top:1px solid var(--line);background:#faf8f1;padding:18px 24px}
+.formation-unplaced h3{font-size:12px;color:#9a8357;display:flex;align-items:center;gap:8px}
+.formation-unplaced h3>span{background:#eee6d6;border-radius:4px;font-size:10px;padding:3px 6px}
+.formation-unplaced p{font-size:10px;color:#a69b85;margin-top:6px;line-height:1.7}
+.formation-unplaced>div+div{margin-top:12px;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.formation-unplaced-player{border:1px solid #e6e3d6;border-radius:6px;padding:0 9px 7px;background:#fff}
+.formation-unplaced-player .formation-player{border:0}
+.formation-unplaced-player small{font-size:9px;color:#a49c88;display:block}
+.formation-empty-team{font-size:11px;line-height:1.8;padding:0 24px 20px;color:#91a17c}
+@media(max-width:1000px){.formation-field{padding:15px 14px 20px;margin:0 12px}.formation-row{gap:9px}.formation-attack{padding:0 2%}.formation-defence{gap:7px}.formation-slot{padding:9px 7px}.formation-interiors{gap:12%;padding:0 14%}.formation-pivot,.formation-goalkeeper{width:30%}.formation-player{font-size:11px}.formation-player>svg{display:none}}
+@media(max-width:560px){.formation-heading{padding:18px 15px 12px}.formation-heading h2{font-size:18px}.formation-heading .eyebrow{font-size:7px}.formation-heading p,.formation-explainer{font-size:10px}.formation-explainer{padding:0 15px 14px}.formation-count{font-size:10px;padding:8px}.formation-field{margin:0 7px;padding:13px 7px 18px}.formation-row{gap:6px;margin-bottom:15px}.formation-attack{padding:0}.formation-interiors{padding:0 10%;gap:13%}.formation-defence{gap:5px}.formation-pivot,.formation-goalkeeper{width:36%}.formation-slot{padding:8px 5px;border-radius:5px}.formation-slot-heading h3{font-size:8px;letter-spacing:0}.formation-slot-heading>span{font-size:8px;min-width:15px;padding:2px}.formation-position-name{font-size:8px;min-height:24px}.formation-player{font-size:10px;gap:4px;align-items:flex-start;min-height:44px}.formation-dorsal{width:16px;height:19px;font-size:8px}.formation-defence .formation-dorsal{display:none}.formation-no-players{font-size:9px;line-height:1.6}.formation-candidates{max-height:160px}.formation-footnote{padding:12px 15px;font-size:9px}.formation-unplaced{padding:15px}.formation-unplaced>div+div{grid-template-columns:1fr 1fr}.formation-empty-team{padding:0 15px 17px;font-size:10px}}
+@media(pointer:coarse){.formation-player{min-height:48px;font-size:12px}.formation-candidates{max-height:200px}}

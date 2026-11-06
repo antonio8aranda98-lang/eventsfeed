@@ -14,6 +14,12 @@ Centro de operaciones para eventos de fútbol de 60–80 jugadores. La web tiene
 
 Las 11 categorías solicitadas están incluidas. La categoría de inscripción y la recomendada son campos distintos. Una valoración completa tiene cuatro notas y categoría; se pueden guardar valoraciones parciales.
 
+## Campo 4-3-3 por equipo
+
+En **Equipos**, Antonio selecciona una tarjeta de equipo y el entrenador accede directamente al suyo. El campo muestra los jugadores presentes compatibles con cada uno de los once puestos del 4-3-3. Tocar un nombre abre la misma ficha de valoración.
+
+Es una vista de disponibilidad por puesto: un DFC aparece en ambos puestos de central, un MC/MCO en ambos interiores y una posición múltiple como `LI / EI` en ambos puestos. Las posiciones específicas, como `central izquierdo`, conservan su lado. Los jugadores con posiciones vacías o no reconocidas aparecen en **Posición por revisar**, donde se puede abrir la ficha y corregirlas. Las actualizaciones de posición, asistencia y equipo se reflejan con la sincronización habitual.
+
 ## Sincronización y permisos
 
 - Actualización de datos desde el servidor cada **3 segundos**; requiere internet.
