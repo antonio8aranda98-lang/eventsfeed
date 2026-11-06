@@ -1,0 +1,8 @@
+import { sqliteTable, text, integer } from 'drizzle-orm/sqlite-core';
+export const events = sqliteTable('events', { id: text().primaryKey(), name: text().notNull(), date: text().notNull(), location: text().notNull(), status: text().notNull(), created: integer().notNull() });
+export const players = sqliteTable('players', { id: text().primaryKey(), event: text().notNull(), team: integer().notNull().default(0), attendance: text().notNull().default('pending'), data: text().notNull(), version: integer().notNull().default(0), goals: integer().notNull().default(0) });
+export const evaluations = sqliteTable('evaluations', { player: text().primaryKey(), data: text().notNull(), version: integer().notNull().default(0), updated: integer().notNull(), author: text().notNull() });
+export const news = sqliteTable('news', { id: text().primaryKey(), event: text().notNull(), team: integer().notNull(), player: text(), text: text().notNull(), kind: text().notNull(), announced: integer().notNull().default(0), created: integer().notNull() });
+export const access = sqliteTable('access', { id: text().primaryKey(), event: text().notNull(), role: text().notNull(), team: integer().notNull(), hash: text().notNull() });
+export const sessions = sqliteTable('sessions', { hash: text().primaryKey(), role: text().notNull(), event: text().notNull(), team: integer().notNull(), expires: integer().notNull() });
+export const loginAttempts = sqliteTable('login_attempts', { key: text().primaryKey(), count: integer().notNull(), reset: integer().notNull() });
