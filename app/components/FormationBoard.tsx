@@ -1,10 +1,10 @@
 'use client';
 import { ArrowUp, ChevronRight, Users } from 'lucide-react';
-import { teams, type Player } from '@/lib/model';
+import { teamAppearance, type TeamSettings, type Player } from '@/lib/model';
 import { teamAvailability } from '@/lib/formation';
 import './formation.css';
 
-type Props = { players: Player[]; team: number; onPlayer: (player: Player) => void };
+type Props = { players: Player[]; team: number; settings: TeamSettings; onPlayer: (player: Player) => void };
 
 function AvailablePlayer({ player, onPlayer }: { player: Player; onPlayer: Props['onPlayer'] }) {
   return <button type="button" className="formation-player" onClick={() => onPlayer(player)} aria-label={`Abrir ficha de ${player.name}`} title={`${player.name} · ${player.position || 'Sin posición'}`}>
@@ -13,8 +13,8 @@ function AvailablePlayer({ player, onPlayer }: { player: Player; onPlayer: Props
   </button>;
 }
 
-export default function FormationBoard({ players, team: teamId, onPlayer }: Props) {
-  const team = teams.find(candidate => candidate.id === teamId)!;
+export default function FormationBoard({ players, team: teamId, settings, onPlayer }: Props) {
+  const team = teamAppearance(teamId, settings);
   const availability = teamAvailability(players, teamId);
   return <section className="formation-panel" aria-label={`Esquema 4-3-3 de ${team.name}`} style={{ '--formation-team': team.color } as React.CSSProperties}>
     <header className="formation-heading"><div><span className="eyebrow">DISPONIBLES POR POSICIÓN</span><h2><span className="team-dot" style={{ background: team.color }} />{team.name}<span className="formation-system">4-3-3</span></h2><p>{availability.players.length} jugadores presentes · Toca un nombre para abrir su ficha.</p></div><span className="formation-count"><Users size={15} />{availability.players.length}</span></header>

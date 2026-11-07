@@ -16,6 +16,11 @@ state=(await request('state?event='+event,undefined,admin)).data;assert.equal(st
 const coaches=[];const accessPins=new Set();
 for(let team=1;team<=5;team++){const access=(await request('access',{event,team},admin)).data.code;assert(/^[1-9][0-9]{3}$/.test(access));assert(!accessPins.has(access));accessPins.add(access);const cookie=(await request('login',{code:access})).cookie;coaches.push(cookie);const own=(await request('state',undefined,cookie)).data;assert.equal(own.players.length,20);assert(own.players.every(p=>p.team===team&&!p.phone));await request('evaluation',{id:own.players[0].id,version:0,scores:[8,7,9,8],comment:'Validación local del guardado',category:'Preferente juvenil'},cookie);}
 state=(await request('state?event='+event,undefined,admin)).data;assert.equal(state.players.filter(p=>p.evaluation).length,5);
+const styleRevision=state.event.rosterRevision;
+await request('team-settings',{event,version:state.event.teamSettingsVersion,teams:[{id:1,name:'Azul local',color:'#2468AC'},{id:5,name:'Quinto local',color:'#FFFFFF'}]},admin);
+const styled=(await request('state',undefined,coaches[0])).data;
+assert.equal(styled.event.teamSettings['1'].name,'Azul local');assert.equal(styled.event.teamSettings['1'].color,'#2468ac');assert.equal(styled.event.rosterRevision,styleRevision);assert.equal(styled.players.length,20);
+await request('team-settings',{event,version:0,teams:[{id:1,name:'Stale',color:'#000000'}]},admin,409);
 const p=state.players.find(p=>p.team===1);await request('news',{event,player:p.id,kind:'goal',requestId:crypto.randomUUID()},coaches[0]);
 const speakerCode=(await request('access',{event,team:0},admin)).data.code;assert(/^[1-9][0-9]{3}$/.test(speakerCode));assert(!accessPins.has(speakerCode));const speaker=(await request('login',{code:speakerCode})).cookie;const speech=(await request('state',undefined,speaker)).data;assert.equal(speech.players.length,0);assert.equal(speech.news.length,1);await request('announce',{id:speech.news[0].id,announced:true},speaker);
 state=(await request('state?event='+event,undefined,admin)).data;
@@ -23,6 +28,6 @@ for(const player of state.players.slice(50,100))await request('player',{id:playe
 state=(await request('state?event='+event,undefined,admin)).data;
 const reduced=(await request('organize',{event,teamCount:3,revision:state.event.rosterRevision},admin)).data;assert.deepEqual(reduced.teams.map(t=>t.count),[17,17,16]);
 await request('state',undefined,coaches[4],401);
-state=(await request('state?event='+event,undefined,admin)).data;assert.equal(state.event.teamCount,3);assert.equal(state.players.filter(p=>p.evaluation).length,5);assert(state.players.filter(p=>p.attendance==='absent').every(p=>p.team===0));
+state=(await request('state?event='+event,undefined,admin)).data;assert.equal(state.event.teamCount,3);assert.equal(state.event.teamSettings['1'].name,'Azul local');assert.equal(state.event.teamSettings['5'].name,'Quinto local');assert.equal(state.players.filter(p=>p.evaluation).length,5);assert(state.players.filter(p=>p.attendance==='absent').every(p=>p.team===0));
 const late=state.players.find(p=>p.attendance==='absent');await request('player',{id:late.id,version:late.version,attendance:'present',team:1},admin);
 console.log('PASS: close 20 pending automatically + late arrival; real HTTP + D1 — 100 attendees → 5 teams of 20; 50 attendees → 3 teams of 17/17/16; 5 coach sessions, evaluations retained, removed access revoked, speaker feed working.');

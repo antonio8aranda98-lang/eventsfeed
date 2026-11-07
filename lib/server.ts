@@ -1,5 +1,5 @@
 import { env } from 'cloudflare:workers';
-import { categories, demoState, MIN_TEAMS, MAX_TEAMS } from './model';
+import { categories, demoState, MIN_TEAMS, MAX_TEAMS, parseTeamSettings, mergeTeamSettings } from './model';
 import { allocatePlayers } from './allocation';
 const encoder = new TextEncoder();
 export async function hash(s: string) { return Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', encoder.encode(s)))).map(x => x.toString(16).padStart(2, '0')).join(''); }
@@ -99,7 +99,7 @@ async function route(req: Request, path: string[]) {
     if (!s)
         fail('Inicia sesión para continuar.', 401);
     if (action === 'state' && req.method === 'GET') {
-        const events = (s.role === 'admin' ? await all('SELECT * FROM events ORDER BY created DESC') : await all('SELECT * FROM events WHERE id=?', s.event)).map(e => ({ ...e, teamCount: e.team_count, rosterRevision: e.roster_revision }));
+        const events = (s.role === 'admin' ? await all('SELECT * FROM events ORDER BY created DESC') : await all('SELECT * FROM events WHERE id=?', s.event)).map(e => ({ ...e, teamCount: e.team_count, rosterRevision: e.roster_revision, teamSettings: parseTeamSettings(e.team_settings), teamSettingsVersion: e.team_settings_version }));
         const selected = url.searchParams.get('event') || events[0]?.id;
         if (!selected)
             return json({ role: s.role, team: s.team, event: null, events, players: [], news: [] });
@@ -134,6 +134,16 @@ async function route(req: Request, path: string[]) {
             fail('Estado no válido.');
         await run('UPDATE events SET status=? WHERE id=?', body.status, body.event);
         return json({ ok: true });
+    }
+    if (action === 'team-settings' && req.method === 'POST') {
+        onlyAdmin(s);
+        const event = await eventAccess(s, body.event);
+        if (!Number.isInteger(body.version) || body.version !== event.team_settings_version) fail('Otro dispositivo ha editado los equipos. Cierra y vuelve a abrir el editor para revisar los cambios.', 409);
+        let settings;
+        try { settings = mergeTeamSettings(parseTeamSettings(event.team_settings), body.teams, event.team_count); } catch (error: any) { fail(error.message); }
+        const result = await run('UPDATE events SET team_settings=?,team_settings_version=team_settings_version+1 WHERE id=? AND team_settings_version=? AND team_count=?', JSON.stringify(settings), event.id, body.version, event.team_count);
+        if (!result.meta.changes) fail('Los equipos han cambiado durante la edición. Cierra y vuelve a abrir el editor.', 409);
+        return json({ teamSettings: settings, version: event.team_settings_version + 1 });
     }
     if (action === 'organize' && req.method === 'POST') {
         onlyAdmin(s);
