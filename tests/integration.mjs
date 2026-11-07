@@ -11,7 +11,7 @@ const modelURL=compile(readFileSync('lib/model.ts','utf8'));const model=await im
 const formationURL=compile(readFileSync('lib/formation.ts','utf8'));
 const allocationURL=compile(readFileSync('lib/allocation.ts','utf8').replace("from './formation'",`from '${formationURL}'`).replace("from './model'",`from '${modelURL}'`));
 const server=readFileSync('lib/server.ts','utf8').replace("import { env } from 'cloudflare:workers';",'const env=globalThis.__EF_ENV;').replace("from './model'",`from '${modelURL}'`).replace("from './allocation'",`from '${allocationURL}'`);
-const {handle}=await import(compile(server));
+const {handle,hash}=await import(compile(server));
 let checks=0;const check=(condition,message)=>{assert.ok(condition,message);checks++;};
 async function call(path,body,cookie){const headers={origin:'https://events.test','Content-Type':'application/json','cf-connecting-ip':'test-'+(cookie||body?.code||'public')};if(cookie)headers.cookie=cookie;const res=await handle(new Request('https://events.test/api/'+path,{method:body?'POST':'GET',headers,body:body?JSON.stringify(body):undefined}),path.split('?')[0].split('/'));let data=await res.json();return {status:res.status,data,cookie:res.headers.get('set-cookie')?.split(';')[0]};}
 check((await call('state')).status===401,'Anonymous cannot read players');
@@ -28,6 +28,7 @@ check((await call('player',{id:keeper.id,version:0,team:1,attendance:'present'},
 check((await call('player',{id:striker.id,version:0,team:2,attendance:'present'},admin)).status===200,'Check in striker');
 check((await call('player',{id:keeper.id,version:0,team:3},admin)).status===409,'Stale check-in cannot overwrite assignment');
 const c1=(await call('access',{event,team:1},admin)).data.code;const c2=(await call('access',{event,team:2},admin)).data.code;const sp=(await call('access',{event,team:0},admin)).data.code;
+check([c1,c2,sp].every(code=>/^[1-9][0-9]{3}$/.test(code))&&new Set([c1,c2,sp]).size===3,'Coach and speaker codes are distinct four-digit PINs');
 const coach1=(await call('login',{code:c1})).cookie,coach2=(await call('login',{code:c2})).cookie,speaker=(await call('login',{code:sp})).cookie;
 s=(await call('state',undefined,coach1)).data;check(s.players.length===1&&s.players[0].name==='Test Keeper','Coach sees only own team');check(!JSON.stringify(s).includes('PRIVATE'),'Private contacts redacted');
 check((await call('state?event='+second,undefined,coach1)).status===403,'Coach cannot access another event');
@@ -132,6 +133,31 @@ check(r.status===200&&r.data.present===4&&r.data.closedPending===3&&r.data.teams
 closing=(await call('state?event='+closingEvent,undefined,admin)).data;
 const lateArrival=closing.players.find(p=>p.attendance==='absent');
 check((await call('player',{id:lateArrival.id,version:lateArrival.version,attendance:'present',team:1},admin)).status===200,'Late arrivals can be checked in and assigned after closing');
+const pinEvent=(await call('events',{name:'PIN fixture'},admin)).data.id;
+const pinOtherEvent=(await call('events',{name:'Other PIN fixture'},admin)).data.id;
+const usedHashes=new Set(sqlite.prepare('SELECT hash FROM access').all().map(row=>row.hash));
+const freePins=[];for(let n=1000;freePins.length<6;n++){const pin=String(n);if(!usedHashes.has(await hash(pin)))freePins.push(pin);}
+async function withPins(pins,operation){const original=crypto.getRandomValues;let cursor=0;crypto.getRandomValues=function(array){if(array instanceof Uint16Array){array[0]=Number(pins[Math.min(cursor++,pins.length-1)])-1000;return array;}return original.call(crypto,array);};try{return await operation();}finally{crypto.getRandomValues=original;}}
+const pinA=(await withPins([freePins[0]],()=>call('access',{event:pinEvent,team:1},admin))).data.code;
+let pinSession=(await call('login',{code:pinA})).cookie;
+sqlite.prepare("UPDATE sessions SET expires=0 WHERE event=? AND role='coach' AND team=1").run(pinEvent);
+check((await call('state',undefined,pinSession)).status===401,'Expired tablet session ends normally');
+pinSession=(await call('login',{code:pinA})).cookie;
+check((await call('state',undefined,pinSession)).data.event.id===pinEvent,'Same four-digit PIN works after session expires');
+const pinB=(await withPins([pinA,freePins[1]],()=>call('access',{event:pinOtherEvent,team:1},admin))).data.code;
+check(pinB===freePins[1]&&pinB!==pinA,'PIN collision across events is retried');
+check((await call('state',undefined,pinSession)).status===200,'Collision leaves the existing team session intact');
+r=await withPins([pinA],()=>call('access',{event:pinEvent,team:1},admin));
+check(r.status===503&&(await call('state',undefined,pinSession)).status===200,'Failed PIN rotation retains previous code and sessions');
+const pinC=(await withPins([pinB,freePins[2]],()=>call('access',{event:pinEvent,team:2},admin))).data.code;
+check(pinC===freePins[2]&&pinC!==pinB,'Same-event and other-event PINs remain distinct');
+const usualAdminPassword=globalThis.__EF_ENV.ADMIN_PASSWORD;globalThis.__EF_ENV.ADMIN_PASSWORD=freePins[3];
+try{r=await withPins([freePins[3],freePins[4]],()=>call('access',{event:pinEvent,team:3},admin));check(r.status===200&&r.data.code===freePins[4],'Generated PIN can never equal admin credential');}finally{globalThis.__EF_ENV.ADMIN_PASSWORD=usualAdminPassword;}
+const rotatedPin=(await withPins([pinB,pinA,freePins[5]],()=>call('access',{event:pinEvent,team:1},admin))).data.code;
+check(rotatedPin===freePins[5]&&(await call('state',undefined,pinSession)).status===401&&(await call('login',{code:pinA})).status===401,'Successful PIN rotation revokes only old team access');
+sqlite.prepare('INSERT INTO access (id,event,role,team,hash) VALUES (?,?,?,?,?)').run('legacy-pin-test',pinEvent,'coach',4,await hash('OLD-CODE-123'));
+check((await call('login',{code:'OLD-CODE-123'})).status===200,'Existing longer codes continue working');
+check((await call('login',{code:usualAdminPassword})).status===200,'Usual administrator credential remains unchanged');
 await call('logout',{},admin);check((await call('state',undefined,admin)).status===401,'Logout revokes session');
 const csv='\uFEFFNombre;Año nacimiento;Equipo actual;Posición;Teléfono\r\n"Player; Example";2008;"Club ""A""";DFC;123\r\n';const rows=model.parseCSV(csv);check(rows[1][0]==='Player; Example'&&rows[1][2]==='Club "A"','CSV handles quotes, BOM and delimiter');const map=model.autoMap(rows[0]);check(map.name===0&&map.position===3&&map.phone===4,'Import matches actual source headings');check(model.safeCSV([['=SUM(1,2)']]).includes("'=SUM"),'CSV export neutralizes formulas');check(model.categories.length===11,'All eleven requested categories');
 const formation=await import(compile(readFileSync('lib/formation.ts','utf8')));

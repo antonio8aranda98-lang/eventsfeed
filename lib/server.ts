@@ -9,6 +9,11 @@ const json = (value: unknown, status = 200, headers: Record<string, string> = {}
 function fail(message: string, status = 400): never { throw Object.assign(Error(message), { status }); }
 const clean = (v: unknown, max = 300) => String(v ?? '').trim().slice(0, max);
 const id = () => crypto.randomUUID();
+function randomAccessPin() {
+    let sample: number;
+    do { sample = crypto.getRandomValues(new Uint16Array(1))[0]; } while (sample >= 63000);
+    return String(1000 + sample % 9000);
+}
 const run = async (sql: string, ...params: unknown[]) => db().prepare(sql).bind(...params).run();
 const one = async (sql: string, ...params: unknown[]) => db().prepare(sql).bind(...params).first<any>();
 const all = async (sql: string, ...params: unknown[]) => (await db().prepare(sql).bind(...params).all<any>()).results;
@@ -167,14 +172,24 @@ async function route(req: Request, path: string[]) {
         const team = Number(body.team), role = team ? 'coach' : 'speaker';
         if (team < 0 || team > event.team_count || !Number.isInteger(team))
             fail('Equipo no válido.');
-        const code = Array.from(crypto.getRandomValues(new Uint8Array(10))).map(n => 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'[n % 32]).join('');
-        const results = await db().batch([
-            db().prepare('DELETE FROM access WHERE event=? AND role=? AND team=?').bind(body.event, role, team),
-            db().prepare('DELETE FROM sessions WHERE event=? AND role=? AND team=?').bind(body.event, role, team),
-            db().prepare('INSERT INTO access (id,event,role,team,hash) SELECT ?,?,?,?,? WHERE EXISTS (SELECT 1 FROM events WHERE id=? AND team_count>=?)').bind(id(), body.event, role, team, await hash(code), body.event, team),
-        ]);
-        if (!results[2].meta.changes) fail('El número de equipos ha cambiado. Actualiza antes de generar el acceso.', 409);
-        return json({ code, role, team });
+        const administratorHash = (env as any).ADMIN_PASSWORD ? await hash(String((env as any).ADMIN_PASSWORD)) : '';
+        for (let attempt = 0; attempt < 40; attempt++) {
+            const code = randomAccessPin();
+            const codeHash = await hash(code);
+            if (codeHash === administratorHash) continue;
+            // D1 batches are atomic. Guard every statement so a collision leaves
+            // the previous code and sessions intact, including concurrent requests.
+            const guard = 'NOT EXISTS (SELECT 1 FROM access WHERE hash=?) AND EXISTS (SELECT 1 FROM events WHERE id=? AND team_count>=?)';
+            const results = await db().batch([
+                db().prepare(`DELETE FROM access WHERE event=? AND role=? AND team=? AND ${guard}`).bind(body.event, role, team, codeHash, body.event, team),
+                db().prepare(`DELETE FROM sessions WHERE event=? AND role=? AND team=? AND ${guard}`).bind(body.event, role, team, codeHash, body.event, team),
+                db().prepare(`INSERT INTO access (id,event,role,team,hash) SELECT ?,?,?,?,? WHERE ${guard}`).bind(id(), body.event, role, team, codeHash, codeHash, body.event, team),
+            ]);
+            if (results[2].meta.changes) return json({ code, role, team });
+            const latest = await one('SELECT team_count FROM events WHERE id=?', body.event);
+            if (!latest || team > latest.team_count) fail('El número de equipos ha cambiado. Actualiza antes de generar el acceso.', 409);
+        }
+        fail('No se ha podido generar un PIN libre. Vuelve a intentarlo.', 503);
     }
     if (action === 'sheet' && req.method === 'POST') {
         onlyAdmin(s);

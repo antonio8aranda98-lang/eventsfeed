@@ -11,3 +11,9 @@
 
 /* Shared app mark: the same football identity in Safari and on the home screen. */
 img.brandmark{padding:0;object-fit:cover;flex-shrink:0}
+
+.login-access-options{display:grid;grid-template-columns:1fr 1fr;gap:5px;padding:5px;margin-top:25px;border:1px solid #e0e6d5;background:#edf1e5;border-radius:8px}
+.login-access-options button{min-height:39px;padding:8px 7px;border-radius:5px;font-size:11px;color:#8b987b;font-weight:500}
+.login-access-options button.selected{background:#fff;color:#4f6d3c;box-shadow:0 1px 4px #29452a0d}
+.login-panel .login-access-options+form{margin-top:20px}
+@media(pointer:coarse){.login-access-options button{min-height:44px}.login-panel input{font-size:16px}}

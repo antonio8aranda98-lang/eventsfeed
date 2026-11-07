@@ -7,7 +7,7 @@ Centro de operaciones para eventos de fútbol de hasta 300 jugadores presentes. 
 1. Antonio entra con su código y crea un evento con nombre, fecha y campo.
 2. Importa el CSV de inscritos: en Google Sheets, **Archivo → Descargar → Valores separados por comas**. La importación permite revisar y asignar las columnas. También puede leer un enlace exportable sin autenticación. No es necesario hacer pública una hoja privada.
 3. En **Check-in**, marca **Asiste** a quienes han venido. Elige de 2 a 10 equipos y pulsa **Cerrar check-in y organizar**: los pendientes pasan a **No asiste** y se reparten solo los presentes. Cuando ya no hay pendientes, el botón se llama **Organizar equipos**. También puedes mover a un jugador manualmente después. Los nuevos jugadores entran como pendientes. Se pueden añadir y editar fichas manualmente.
-4. En **Accesos de las tablets**, genera un código por equipo y otro para el speaker. Cada dispositivo abre la misma web e introduce su código. No necesita cuenta de ChatGPT.
+4. En **Accesos de las tablets**, genera un PIN numérico de 4 cifras por equipo y otro para el speaker. Cada dispositivo abre la misma web e introduce su código. No necesita cuenta de ChatGPT.
 5. Cada entrenador ve solo a los jugadores presentes de su equipo, registra comentarios, notas de 1 a 10 en Físico, Imagen, Técnico y Táctico, y una categoría recomendada. **Guardar valoración** la envía a la base compartida.
 6. Los entrenadores registran goles, partidos sin encajar y noticias redactadas para megafonía. El speaker ve la cola y marca cada noticia como anunciada.
 7. Antonio exporta un CSV con los resultados, cierra el evento y puede crear el siguiente conservando el histórico.
@@ -28,7 +28,7 @@ Es una vista de disponibilidad por puesto: un DFC aparece en ambos puestos de ce
 - Control de versión en fichas y valoraciones para evitar sobrescribir cambios concurrentes. Las valoraciones acompañan al jugador al cambiar de equipo.
 - El entrenador puede editar posición y dorsal. Antonio puede editar los datos de inscripción y la asignación.
 - El speaker no recibe teléfonos, fichas personales ni comentarios de evaluación. Solo las noticias redactadas para anunciar.
-- Códigos y sesiones almacenados con SHA-256; códigos aleatorios, cookies HttpOnly y SameSite=Strict, Secure en HTTPS, sesiones de 12 horas y límite de intentos de inicio de sesión. Renovar un código revoca las sesiones de ese equipo en el evento.
+- Códigos y sesiones almacenados con SHA-256; PIN aleatorios de 4 cifras, sin coincidencias entre accesos existentes ni con el código de administrador; cookies HttpOnly y SameSite=Strict, Secure en HTTPS, sesiones de 12 horas y límite de intentos de inicio de sesión. Renovar un código revoca las sesiones de ese equipo en el evento.
 - El modo de ejemplo es ficticio, de solo lectura, y no utiliza los datos de la hoja de referencia.
 - Importación adicional: omite coincidencias de nombre normalizado y año sin sobrescribir datos ni valoraciones. Si hay dos jugadores con el mismo nombre y año, añádelos manualmente con una distinción en el nombre.
 
@@ -86,3 +86,9 @@ Los equipos nuevos tienen su propio acceso desde **Accesos de las tablets**. Los
 `npm test` incluye pruebas de tamaños, cobertura, porteros escasos, polivalencia, concurrencia, rollback de la transacción, permisos, conservación de valoraciones y revocación de accesos. `node tests/local-smoke.mjs` prueba el flujo completo contra la base **local**, usando solo jugadores ficticios.
 
 Si llega un jugador después del cierre del check-in, Antonio puede cambiarlo de **No asiste** a **Asiste** y asignarle un equipo, o volver a organizar. No hace falta reabrir el check-in.
+
+## PIN de las tablets
+
+Los nuevos accesos de entrenadores y speaker usan **4 cifras**, entre 1000 y 9999. En la pantalla de entrada, **PIN del equipo** abre el teclado numérico. **Antonio / otro código** permite usar el código de administrador o un código anterior sin limitarlo a cuatro cifras. Las sesiones siguen durando 12 horas; el PIN continúa siendo válido para volver a entrar hasta que Antonio lo renueve o elimine ese equipo.
+
+Los códigos ya generados continúan funcionando. Para cambiarlos, Antonio entra en **Accesos de las tablets**, elige **Generar PIN** (o **Renovar PIN** mientras lo tiene visible) y comparte el nuevo PIN. La renovación cierra las sesiones del equipo correspondiente. Los PIN se generan con aleatoriedad criptográfica y la base comprueba que estén libres entre todos los accesos existentes; una colisión no borra el código ni las sesiones anteriores.
